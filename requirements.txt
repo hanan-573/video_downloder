@@ -1,0 +1,5 @@
+flask
+flask-cors
+yt-dlp[default]
+segno
+imageio-ffmpeg

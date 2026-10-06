@@ -1,0 +1,12 @@
+{
+  "name": "yt-downloader-pro",
+  "version": "1.0.0",
+  "description": "YouTube Downloader Pro - up to 4K 60fps",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

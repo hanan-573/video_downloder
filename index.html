@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT Downloader Pro</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --accent: #38bdf8;
+    --accent2: #06b6d4;
+  }
+  [data-theme="violet"] { --accent: #a855f7; --accent2: #ec4899; }
+  [data-theme="emerald"] { --accent: #10b981; --accent2: #14b8a6; }
+  [data-theme="sunset"] { --accent: #f97316; --accent2: #ef4444; }
+  [data-theme="rose"] { --accent: #f43f5e; --accent2: #d946ef; }
+
+  html, body { min-height: 100%; }
+  body {
+    background: #0a0f1a;
+    color: #e5e7eb;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+
+  #bg3d {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    display: block;
+  }
+
+  .glass {
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .accent-text { color: var(--accent); }
+  .accent-bg   { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+
+  .btn-accent {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    transition: all .25s ease;
+  }
+  .btn-accent:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.12);
+    box-shadow: 0 8px 24px -6px var(--accent);
+  }
+  .btn-accent:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+    filter: none;
+    box-shadow: none;
+  }
+
+  .swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 9999px;
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, .2);
+    transition: transform .2s ease, border-color .2s ease;
+    flex-shrink: 0;
+  }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active { border-color: #fff; transform: scale(1.15); }
+
+  .card { transition: all .3s ease; }
+  .card:hover { border-color: rgba(255, 255, 255, .16); }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .15);
+    border-radius: 4px;
+  }
+
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  input:focus, select:focus, button:focus { outline: none; }
+
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px !important;
+  }
+</style>
+</head>
+<body>
+<canvas id="bg3d"></canvas>
+
+<div class="relative z-10 max-w-5xl mx-auto px-4 py-6 sm:py-10">
+
+  <!-- Header -->
+  <header class="glass rounded-2xl p-4 sm:p-5 mb-6 flex flex-wrap items-center gap-3 justify-between">
+    <div class="flex items-center gap-3">
+      <div class="accent-bg w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold text-white shadow-lg">↓</div>
+      <div>
+        <h1 class="text-lg sm:text-xl font-bold tracking-tight">YT Downloader <span class="accent-text">Pro</span></h1>
+        <p class="text-xs text-slate-400">Up to 4K · 60 FPS</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 flex-wrap">
+      <div class="flex items-center gap-2">
+        <div class="swatch" data-t="ocean"   title="Ocean"   style="background:linear-gradient(135deg,#38bdf8,#06b6d4)"></div>
+        <div class="swatch" data-t="violet"  title="Violet"  style="background:linear-gradient(135deg,#a855f7,#ec4899)"></div>
+        <div class="swatch" data-t="emerald" title="Emerald" style="background:linear-gradient(135deg,#10b981,#14b8a6)"></div>
+        <div class="swatch" data-t="sunset"  title="Sunset"  style="background:linear-gradient(135deg,#f97316,#ef4444)"></div>
+        <div class="swatch" data-t="rose"    title="Rose"    style="background:linear-gradient(135deg,#f43f5e,#d946ef)"></div>
+      </div>
+      <button id="refreshBtn" class="glass px-3 py-2 rounded-xl text-sm hover:bg-white/5 transition flex items-center gap-2">
+        <span id="refreshIcon" class="inline-block">↻</span> Refresh
+      </button>
+    </div>
+  </header>
+
+  <!-- Error box -->
+  <div id="errorBox" class="hidden mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm break-words"></div>
+
+  <!-- URL input -->
+  <section class="glass card rounded-2xl p-4 sm:p-6 mb-6">
+    <label for="urlInput" class="block text-sm font-medium mb-2 text-slate-300">Paste a YouTube link</label>
+    <div class="flex flex-col sm:flex-row gap-3">
+      <input id="urlInput" type="text" autocomplete="off" spellcheck="false"
+        placeholder="https://www.youtube.com/watch?v=..."
+        class="flex-1 bg-slate-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-[var(--accent)] transition" />
+      <button id="analyzeBtn" class="btn-accent text-white font-semibold px-6 py-3 rounded-xl text-sm">Analyze</button>
+    </div>
+  </section>
+
+  <!-- Preview -->
+  <section id="previewCard" class="hidden glass card rounded-2xl p-4 sm:p-6 mb-6">
+    <div class="flex flex-col md:flex-row gap-5">
+      <img id="thumb" class="w-full md:w-64 rounded-xl object-cover aspect-video bg-slate-800" alt="thumbnail" />
+      <div class="flex-1 flex flex-col min-w-0">
+        <h2 id="videoTitle" class="text-lg font-semibold mb-1 leading-snug break-words"></h2>
+        <p class="text-sm text-slate-400 mb-1">By <span id="uploader" class="text-slate-300"></span></p>
+        <p class="text-sm text-slate-400 mb-4">Duration: <span id="duration" class="text-slate-300"></span></p>
+        <label for="qualitySelect" class="block text-sm font-medium mb-2 text-slate-300">Quality</label>
+        <select id="qualitySelect" class="bg-slate-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-[var(--accent)] transition mb-2 w-full"></select>
+        <p class="text-xs text-slate-500 mb-4">4K files play best in VLC. 4K is available only if the video was uploaded in 4K.</p>
+        <button id="downloadBtn" class="btn-accent text-white font-semibold px-6 py-3 rounded-xl text-sm self-start">Download</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Progress -->
+  <section id="progressCard" class="hidden glass card rounded-2xl p-4 sm:p-6 mb-6">
+    <div class="flex justify-between items-center mb-3 gap-3">
+      <h3 class="font-semibold">Downloading…</h3>
+      <span id="stageText" class="text-sm accent-text"></span>
+    </div>
+    <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden mb-3">
+      <div id="progressBar" class="accent-bg h-3 rounded-full transition-all duration-300" style="width:0%"></div>
+    </div>
+    <div class="flex justify-between text-xs text-slate-400 gap-2 flex-wrap">
+      <span id="percentText">0%</span>
+      <span id="speedText"></span>
+      <span id="etaText"></span>
+    </div>
+  </section>
+
+  <!-- Phone card -->
+  <section class="glass card rounded-2xl p-4 sm:p-6 mb-6 flex flex-col sm:flex-row gap-5 items-center">
+    <img id="qrImg" class="w-32 h-32 rounded-xl bg-white p-1 shrink-0" alt="QR code" />
+    <div class="flex-1 text-center sm:text-left w-full">
+      <h3 class="font-semibold mb-1">Open on your phone</h3>
+      <p class="text-sm text-slate-400 mb-3">Same Wi-Fi network required.</p>
+      <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+        <input id="netUrl" readonly class="flex-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-4 py-2 text-sm outline-none" />
+        <button id="copyBtn" class="glass px-4 py-2 rounded-xl text-sm hover:bg-white/5 transition whitespace-nowrap">Copy</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Files -->
+  <section class="glass card rounded-2xl p-4 sm:p-6 mb-6">
+    <h3 class="font-semibold mb-4">Downloaded Files</h3>
+    <div id="filesList" class="space-y-2"></div>
+  </section>
+
+  <footer class="text-center text-xs text-slate-500 py-6">
+    YT Downloader Pro · Local network tool · Stop with <code class="accent-text">python stop.py</code>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var currentUrl = "";
+  var currentEventSource = null;
+  var lastStatus = "";
+  var esClosed = false;
+  var initRetried = false;
+
+  /* ---------------- Theme ---------------- */
+  function setTheme(name) {
+    if (!name) name = "ocean";
+    if (name === "ocean") {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      document.documentElement.setAttribute("data-theme", name);
+    }
+    var swatches = document.querySelectorAll(".swatch");
+    for (var i = 0; i < swatches.length; i++) {
+      swatches[i].classList.toggle("active", swatches[i].getAttribute("data-t") === name);
+    }
+    try { localStorage.setItem("ytdlp-theme", name); } catch (e) {}
+    if (window.__updateBgColors) {
+      try { window.__updateBgColors(); } catch (e) {}
+    }
+  }
+
+  var swatchEls = document.querySelectorAll(".swatch");
+  for (var sIdx = 0; sIdx < swatchEls.length; sIdx++) {
+    (function (el) {
+      el.addEventListener("click", function () {
+        setTheme(el.getAttribute("data-t"));
+      });
+    })(swatchEls[sIdx]);
+  }
+
+  var savedTheme = "ocean";
+  try { savedTheme = localStorage.getItem("ytdlp-theme") || "ocean"; } catch (e) {}
+  setTheme(savedTheme);
+
+  /* ---------------- Error box ---------------- */
+  var errorTimer = null;
+  function showError(msg) {
+    var box = $("errorBox");
+    if (!box) return;
+    box.textContent = msg || "Something went wrong.";
+    box.classList.remove("hidden");
+    if (errorTimer) clearTimeout(errorTimer);
+    errorTimer = setTimeout(function () {
+      box.classList.add("hidden");
+    }, 8000);
+  }
+
+  /* ---------------- API ---------------- */
+  function api(path, opts) {
+    return fetch(path, opts).then(function (res) {
+      return res.text().then(function (txt) {
+        var data = null;
+        if (txt) {
+          try { data = JSON.parse(txt); } catch (e) { data = null; }
+        }
+        if (!res.ok) {
+          var msg = (data && data.error) ? data.error : ("Request failed: " + res.status);
+          throw new Error(msg);
+        }
+        return data;
+      });
+    });
+  }
+
+  /* ---------------- Analyze ---------------- */
+  function analyze() {
+    var urlInput = $("urlInput");
+    var btn = $("analyzeBtn");
+    var url = (urlInput.value || "").trim();
+    if (!url) {
+      showError("Please paste a YouTube link.");
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Analyzing…";
+
+    api("/api/info", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: url })
+    })
+      .then(function (data) {
+        currentUrl = url;
+        renderPreview(data || {});
+      })
+      .catch(function (e) {
+        showError(e.message || "Failed to analyze.");
+      })
+      .then(function () {
+        btn.disabled = false;
+        btn.textContent = "Analyze";
+      });
+  }
+
+  $("analyzeBtn").addEventListener("click", analyze);
+  $("urlInput").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); analyze(); }
+  });
+
+  function fmtDuration(sec) {
+    sec = Math.max(0, Math.round(Number(sec) || 0));
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    return h > 0 ? (h + ":" + pad(m) + ":" + pad(s)) : (m + ":" + pad(s));
+  }
+
+  function renderPreview(data) {
+    var thumb = $("thumb");
+    if (data.thumbnail) {
+      thumb.src = data.thumbnail;
+      thumb.style.display = "";
+    } else {
+      thumb.removeAttribute("src");
+      thumb.style.display = "none";
+    }
+    $("videoTitle").textContent = data.title || "Unknown title";
+    $("uploader").textContent = data.uploader || "Unknown";
+    $("duration").textContent = fmtDuration(data.duration);
+
+    var sel = $("qualitySelect");
+    sel.innerHTML = "";
+    var qualities = data.qualities || [];
+    if (qualities.length === 0) {
+      var noneOpt = document.createElement("option");
+      noneOpt.value = "";
+      noneOpt.textContent = "No video qualities found";
+      sel.appendChild(noneOpt);
+    } else {
+      for (var i = 0; i < qualities.length; i++) {
+        var q = qualities[i];
+        var opt = document.createElement("option");
+        opt.value = String(q.height);
+        opt.textContent = q.label;
+        sel.appendChild(opt);
+      }
+    }
+    var audioOpt = document.createElement("option");
+    audioOpt.value = "audio";
+    audioOpt.textContent = "MP3 audio only";
+    sel.appendChild(audioOpt);
+
+    $("previewCard").classList.remove("hidden");
+    $("progressCard").classList.add("hidden");
+  }
+
+  /* ---------------- Download ---------------- */
+  $("downloadBtn").addEventListener("click", startDownload);
+
+  function startDownload() {
+    if (!currentUrl) {
+      showError("Please analyze a video first.");
+      return;
+    }
+    var val = $("qualitySelect").value;
+    if (!val) {
+      showError("Please choose a quality.");
+      return;
+    }
+    var body;
+    if (val === "audio") {
+      body = { url: currentUrl, audio: true };
+    } else {
+      var h = parseInt(val, 10);
+      if (!h || isNaN(h)) {
+        showError("Invalid quality selected.");
+        return;
+      }
+      body = { url: currentUrl, height: h };
+    }
+
+    var btn = $("downloadBtn");
+    btn.disabled = true;
+    btn.textContent = "Starting…";
+
+    api("/api/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(function (data) {
+        if (!data || !data.job_id) throw new Error("No job id returned.");
+        openProgress(data.job_id);
+      })
+      .catch(function (e) {
+        showError(e.message || "Failed to start download.");
+        btn.disabled = false;
+        btn.textContent = "Download";
+      });
+  }
+
+  function openProgress(jobId) {
+    if (currentEventSource) {
+      try { currentEventSource.close(); } catch (e) {}
+      currentEventSource = null;
+    }
+    lastStatus = "";
+    esClosed = false;
+
+    $("progressCard").classList.remove("hidden");
+    updateProgress({ status: "starting", percent: 0 });
+
+    var es;
+    try {
+      es = new EventSource("/api/progress/" + encodeURIComponent(jobId));
+    } catch (e) {
+      showError("Could not open progress stream.");
+      $("downloadBtn").disabled = false;
+      $("downloadBtn").textContent = "Download";
+      return;
+    }
+    currentEventSource = es;
+
+    es.onmessage = function (ev) {
+      if (esClosed) return;
+      var data = null;
+      try { data = JSON.parse(ev.data); } catch (e) { return; }
+      lastStatus = data.status;
+      updateProgress(data);
+
+      if (data.status === "done" || data.status === "error") {
+        esClosed = true;
+        try { es.close(); } catch (e) {}
+        currentEventSource = null;
+        $("downloadBtn").disabled = false;
+        $("downloadBtn").textContent = "Download";
+        if (data.status === "done") {
+          loadFiles();
+        } else if (data.error) {
+          showError(data.error);
+        }
+      }
+    };
+
+    es.onerror = function () {
+      if (esClosed) return;
+      esClosed = true;
+      try { es.close(); } catch (e) {}
+      currentEventSource = null;
+      if (lastStatus !== "done" && lastStatus !== "error") {
+        showError("Connection lost, check the Downloaded Files list");
+      }
+      $("downloadBtn").disabled = false;
+      $("downloadBtn").textContent = "Download";
+    };
+  }
+
+  function updateProgress(data) {
+    data = data || {};
+    var pct = Math.max(0, Math.min(100, Number(data.percent) || 0));
+    $("progressBar").style.width = pct + "%";
+    $("percentText").textContent = pct.toFixed(1) + "%";
+    $("speedText").textContent = data.speed || "";
+    $("etaText").textContent = data.eta ? ("ETA " + data.eta) : "";
+
+    var stage = "";
+    if (data.status === "starting") stage = "Starting";
+    else if (data.status === "downloading") stage = (data.stage === "audio") ? "Downloading audio" : "Downloading video";
+    else if (data.status === "merging") stage = "Merging";
+    else if (data.status === "done") {
+      stage = "Done";
+      $("progressBar").style.width = "100%";
+      $("percentText").textContent = "100%";
+    } else if (data.status === "error") stage = "Error";
+
+    $("stageText").textContent = stage;
+  }
+
+  /* ---------------- Files ---------------- */
+  function loadFiles() {
+    return api("/api/files").then(function (data) {
+      var list = $("filesList");
+      list.innerHTML = "";
+      var files = (data && data.files) || [];
+      if (files.length === 0) {
+        var empty = document.createElement("p");
+        empty.className = "text-sm text-slate-500 py-4 text-center";
+        empty.textContent = "No files downloaded yet.";
+        list.appendChild(empty);
+        return;
+      }
+      for (var i = 0; i < files.length; i++) {
+        list.appendChild(renderFileRow(files[i]));
+      }
+    }).catch(function (e) {
+      showError(e.message || "Failed to load files.");
+    });
+  }
+
+  function renderFileRow(f) {
+    var row = document.createElement("div");
+    row.className = "flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-white/5 hover:border-white/15 transition";
+
+    var icon = document.createElement("div");
+    icon.className = "w-10 h-10 rounded-lg accent-bg flex items-center justify-center text-white text-lg shrink-0";
+    icon.textContent = "🎬";
+
+    var info = document.createElement("div");
+    info.className = "flex-1 min-w-0";
+
+    var name = document.createElement("div");
+    name.className = "text-sm font-medium truncate";
+    name.title = f.name;
+    name.textContent = f.name;
+
+    var meta = document.createElement("div");
+    meta.className = "text-xs text-slate-400";
+    meta.textContent = (f.size || "") + " · " + (f.modified || "");
+
+    info.appendChild(name);
+    info.appendChild(meta);
+
+    var link = document.createElement("a");
+    link.href = "/api/files/" + encodeURIComponent(f.name);
+    link.className = "glass px-3 py-2 rounded-lg text-xs hover:bg-white/5 transition shrink-0";
+    link.textContent = "Save";
+
+    row.appendChild(icon);
+    row.appendChild(info);
+    row.appendChild(link);
+    return row;
+  }
+
+  /* ---------------- Network ---------------- */
+  function loadNetwork() {
+    return api("/api/network").then(function (data) {
+      if (!data) return;
+      $("netUrl").value = data.url || "";
+      if (data.qr) $("qrImg").src = data.qr;
+    }).catch(function () { /* silent */ });
+  }
+
+  $("copyBtn").addEventListener("click", function () {
+    var input = $("netUrl");
+    var val = input.value || "";
+    var btn = $("copyBtn");
+    function done() {
+      btn.textContent = "Copied!";
+      setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(done).catch(function () {
+        input.select();
+        try { document.execCommand("copy"); done(); } catch (e) {}
+      });
+    } else {
+      input.select();
+      try { document.execCommand("copy"); done(); } catch (e) {}
+    }
+  });
+
+  /* ---------------- Refresh ---------------- */
+  $("refreshBtn").addEventListener("click", function () {
+    var icon = $("refreshIcon");
+    icon.classList.add("spin");
+    Promise.all([loadFiles(), loadNetwork()]).then(function () {
+      setTimeout(function () { icon.classList.remove("spin"); }, 400);
+    });
+  });
+
+  /* ---------------- 3D Background ---------------- */
+  function init3D() {
+    if (!window.THREE) return false;
+    var canvas = $("bg3d");
+    if (!canvas) return false;
+
+    var renderer, scene, camera, points, arrows = [];
+    var mouseX = 0, mouseY = 0, targetX = 0, targetY = 0;
+    var clock = new THREE.Clock();
+    var rafId = null;
+
+    function getColors() {
+      var styles = getComputedStyle(document.documentElement);
+      var a = (styles.getPropertyValue("--accent") || "#38bdf8").trim() || "#38bdf8";
+      var b = (styles.getPropertyValue("--accent2") || "#06b6d4").trim() || "#06b6d4";
+      return [new THREE.Color(a), new THREE.Color(b)];
+    }
+
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    } catch (e) {
+      return false;
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 60;
+
+    /* Points */
+    var count = 1500;
+    var positions = new Float32Array(count * 3);
+    var colors = new Float32Array(count * 3);
+    var colPair = getColors();
+    var c1 = colPair[0], c2 = colPair[1];
+
+    for (var i = 0; i < count; i++) {
+      positions[i * 3]     = (Math.random() - 0.5) * 140;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 140;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+      var col = Math.random() > 0.5 ? c1 : c2;
+      colors[i * 3]     = col.r;
+      colors[i * 3 + 1] = col.g;
+      colors[i * 3 + 2] = col.b;
+    }
+
+    var pGeo = new THREE.BufferGeometry();
+    pGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    pGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    var pMat = new THREE.PointsMaterial({
+      size: 0.7,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    points = new THREE.Points(pGeo, pMat);
+    scene.add(points);
+
+    /* Arrows */
+    var arrowMat = new THREE.MeshBasicMaterial({
+      color: c1,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.28
+    });
+
+    var shaftGeo = new THREE.CylinderGeometry(0.6, 0.6, 4, 6);
+    var headGeo  = new THREE.ConeGeometry(1.6, 2.4, 6);
+
+    for (var a = 0; a < 14; a++) {
+      var g = new THREE.Group();
+      var shaft = new THREE.Mesh(shaftGeo, arrowMat);
+      shaft.position.y = 2;
+      var head = new THREE.Mesh(headGeo, arrowMat);
+      head.position.y = -0.6;
+      g.add(shaft);
+      g.add(head);
+      g.position.set(
+        (Math.random() - 0.5) * 120,
+        (Math.random() - 0.5) * 140,
+        (Math.random() - 0.5) * 80
+      );
+      g.rotation.z = Math.random() * Math.PI;
+      scene.add(g);
+      arrows.push(g);
+    }
+
+    window.__updateBgColors = function () {
+      try {
+        var pair = getColors();
+        var a2 = pair[0], b2 = pair[1];
+        var colAttr = points.geometry.attributes.color;
+        for (var k = 0; k < colAttr.count; k++) {
+          var cc = Math.random() > 0.5 ? a2 : b2;
+          colAttr.setXYZ(k, cc.r, cc.g, cc.b);
+        }
+        colAttr.needsUpdate = true;
+        arrowMat.color = a2;
+      } catch (e) {}
+    };
+
+    window.addEventListener("resize", function () {
+      if (!renderer) return;
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+
+    window.addEventListener("mousemove", function (e) {
+      targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+      targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    function animate() {
+      rafId = requestAnimationFrame(animate);
+      var dt = Math.min(clock.getDelta(), 0.05);
+
+      var posAttr = points.geometry.attributes.position;
+      var arr = posAttr.array;
+      for (var p = 0; p < arr.length; p += 3) {
+        arr[p + 1] -= dt * 12;
+        if (arr[p + 1] < -70) arr[p + 1] = 70;
+      }
+      posAttr.needsUpdate = true;
+
+      for (var q = 0; q < arrows.length; q++) {
+        var grp = arrows[q];
+        grp.position.y -= dt * 6;
+        grp.rotation.y += dt * 0.5;
+        grp.rotation.x += dt * 0.3;
+        if (grp.position.y < -75) {
+          grp.position.y = 75;
+          grp.position.x = (Math.random() - 0.5) * 120;
+          grp.position.z = (Math.random() - 0.5) * 80;
+        }
+      }
+
+      mouseX += (targetX - mouseX) * 0.05;
+      mouseY += (targetY - mouseY) * 0.05;
+      camera.position.x = mouseX * 6;
+      camera.position.y = -mouseY * 6;
+      camera.lookAt(scene.position);
+
+      renderer.render(scene, camera);
+    }
+
+    function startLoop() {
+      if (rafId === null) {
+        clock.getDelta();
+        animate();
+      }
+    }
+    function stopLoop() {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) stopLoop();
+      else startLoop();
+    });
+
+    startLoop();
+
+    /* Re-apply theme colors after init in case user clicked early */
+    if (window.__updateBgColors) window.__updateBgColors();
+    return true;
+  }
+
+  /* ---------------- Init ---------------- */
+  function initialLoad() {
+    loadFiles();
+    loadNetwork();
+  }
+
+  init3D();
+  initialLoad();
+
+  /* One silent retry in case the backend is still warming up */
+  setTimeout(function () {
+    if (!initRetried) {
+      initRetried = true;
+      loadFiles();
+      loadNetwork();
+    }
+  }, 2000);
+
+})();
+</script>
+</body>
+</html>
